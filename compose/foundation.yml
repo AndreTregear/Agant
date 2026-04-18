@@ -44,8 +44,13 @@ services:
       MARIADB_ROOT_PASSWORD: ${MARIADB_ROOT_PASSWORD:?MARIADB_ROOT_PASSWORD required}
       MARIADB_CHARACTER_SET_SERVER: utf8mb4
       MARIADB_COLLATION_SERVER: utf8mb4_unicode_ci
+      # Consumed by init-users.sh on first boot to create least-privilege
+      # accounts. Root is not used by any application container.
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD:?WORDPRESS_DB_PASSWORD required}
+      SUPERSET_READ_PASSWORD: ${SUPERSET_READ_PASSWORD:-}
     volumes:
       - ${DATA_DIR}/mariadb:/var/lib/mysql
+      - ../config/mariadb/init-users.sh:/docker-entrypoint-initdb.d/10-users.sh:ro
     ports:
       - "127.0.0.1:3306:3306"
     command:

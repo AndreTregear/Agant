@@ -29,6 +29,7 @@
 # ──────────────────────────────────────────────
 (security-headers) {
 	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
 		X-Content-Type-Options nosniff
 		X-Frame-Options SAMEORIGIN
 		Referrer-Policy strict-origin-when-cross-origin
@@ -69,9 +70,9 @@ files.{$DOMAIN:oficina.local} {
 	tls internal
 	import security-headers
 
-	# WebDAV needs large uploads
+	# Cap uploads. Keep in sync with NEXTCLOUD_UPLOAD_LIMIT in .env.
 	request_body {
-		max_size 10G
+		max_size 2GB
 	}
 
 	reverse_proxy nextcloud:80
@@ -185,9 +186,12 @@ auth.{$DOMAIN:oficina.local} {
 
 # ──────────────────────────────────────────────
 # Portainer — Container Management (admin only)
+# Protected by Authentik forward-auth: only members of
+# the oficina-admins group should be allowed to reach it.
 # ──────────────────────────────────────────────
 admin.{$DOMAIN:oficina.local} {
 	tls internal
 	import security-headers
+	import authentik-forward-auth
 	reverse_proxy portainer:9000
 }

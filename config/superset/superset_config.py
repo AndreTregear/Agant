@@ -50,8 +50,8 @@ OAUTH_PROVIDERS = [
         "icon": "fa-key",
         "token_key": "access_token",
         "remote_app": {
-            "client_id": os.environ.get("SUPERSET_OIDC_CLIENT_ID", "superset-client"),
-            "client_secret": os.environ.get("SUPERSET_OIDC_CLIENT_SECRET", "change-me-superset"),
+            "client_id": os.environ["SUPERSET_OIDC_CLIENT_ID"],
+            "client_secret": os.environ["SUPERSET_OIDC_CLIENT_SECRET"],
             "api_base_url": f"https://auth.{os.environ.get('DOMAIN', 'oficina.local')}/application/o/",
             "access_token_url": f"https://auth.{os.environ.get('DOMAIN', 'oficina.local')}/application/o/token/",
             "authorize_url": f"https://auth.{os.environ.get('DOMAIN', 'oficina.local')}/application/o/authorize/",
@@ -61,9 +61,11 @@ OAUTH_PROVIDERS = [
     }
 ]
 
-# Auto-register users from Authentik
+# Auto-register users from Authentik, but with the most restricted role by
+# default. The Authentik group mapping below elevates trusted groups to
+# Alpha/Admin on every login.
 AUTH_USER_REGISTRATION = True
-AUTH_USER_REGISTRATION_ROLE = "Gamma"
+AUTH_USER_REGISTRATION_ROLE = "Public"
 AUTH_ROLES_MAPPING = {
     "oficina-admins": ["Admin"],
     "oficina-managers": ["Alpha"],
@@ -84,8 +86,10 @@ FEATURE_FLAGS = {
     "EMBEDDED_SUPERSET": True,
 }
 
-# Allow connecting to all Oficina databases
-PREVENT_UNSAFE_DB_CONNECTIONS = False
+# Block connections to databases via untrusted drivers/URIs. Admins must
+# whitelist intended data sources through the UI after creating a read-only
+# user in each target DB.
+PREVENT_UNSAFE_DB_CONNECTIONS = True
 
 ROW_LIMIT = 50000
 SQL_MAX_ROW = 100000

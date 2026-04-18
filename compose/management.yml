@@ -4,7 +4,7 @@
 
 services:
   portainer:
-    image: portainer/portainer-ce:latest
+    image: portainer/portainer-ce:2.21.4
     restart: unless-stopped
     # Admin password set on first web UI access
     volumes:

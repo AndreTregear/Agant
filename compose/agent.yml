@@ -7,7 +7,9 @@ services:
     build:
       context: ${AGENTE_CEO_SRC:-../agente-ceo}
       dockerfile: Dockerfile
-    image: oficina/agente-ceo:latest
+    # Locally built from AGENTE_CEO_SRC. Override AGENTE_CEO_VERSION to
+    # tag/pin a specific build instead of the mutable dev tag.
+    image: oficina/agente-ceo:${AGENTE_CEO_VERSION:-dev}
     restart: unless-stopped
     environment:
       # Server
@@ -33,7 +35,7 @@ services:
       ERPNEXT_API_SECRET: ${ERPNEXT_API_SECRET:-}
       NEXTCLOUD_URL: http://nextcloud
       NEXTCLOUD_USER: ${NEXTCLOUD_ADMIN_USER:-admin}
-      NEXTCLOUD_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD}
+      NEXTCLOUD_PASSWORD: ${NEXTCLOUD_ADMIN_PASSWORD:?NEXTCLOUD_ADMIN_PASSWORD required}
       ROCKETCHAT_URL: http://rocketchat:3000
       ROCKETCHAT_AUTH_TOKEN: ${ROCKETCHAT_AUTH_TOKEN:-}
       ROCKETCHAT_USER_ID: ${ROCKETCHAT_USER_ID:-}
@@ -45,7 +47,7 @@ services:
       ZAMMAD_TOKEN: ${ZAMMAD_TOKEN:-}
       SUPERSET_URL: http://superset:8088
       SUPERSET_USER: ${SUPERSET_ADMIN_USER:-admin}
-      SUPERSET_PASSWORD: ${SUPERSET_ADMIN_PASSWORD}
+      SUPERSET_PASSWORD: ${SUPERSET_ADMIN_PASSWORD:?SUPERSET_ADMIN_PASSWORD required}
       N8N_URL: http://n8n:5678
       N8N_API_KEY: ${N8N_API_KEY:-}
       # Domain

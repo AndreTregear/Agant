@@ -13,8 +13,8 @@ source "${OFICINA_DIR}/.env"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BACKUP_DIR="${OFICINA_DIR}/data/backups/snapshots/${TIMESTAMP}"
 DAILY_DIR="${OFICINA_DIR}/data/backups/daily"
-RETENTION_DAYS_SNAPSHOTS=7
-RETENTION_DAYS_DAILY=30
+RETENTION_DAYS_SNAPSHOTS=14
+RETENTION_DAYS_DAILY=90
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -44,9 +44,13 @@ backup_postgres() {
 # ──────────────────────────────────────────────
 backup_mariadb() {
     log "Dumping MariaDB databases..."
-    docker compose -f "${OFICINA_DIR}/docker-compose.yml" \
-        exec -T mariadb mariadb-dump -u root -p"${MARIADB_ROOT_PASSWORD}" \
-        --all-databases --single-transaction \
+    # MYSQL_PWD is read by the mariadb client automatically. Exported in the
+    # parent shell so the value never appears in argv (host `ps` would see
+    # `-e MYSQL_PWD=...` but not `-e MYSQL_PWD` alone).
+    MYSQL_PWD="${MARIADB_ROOT_PASSWORD}" \
+        docker compose -f "${OFICINA_DIR}/docker-compose.yml" \
+        exec -T -e MYSQL_PWD mariadb \
+        mariadb-dump -u root --all-databases --single-transaction \
         | gzip > "${BACKUP_DIR}/mariadb_all.sql.gz" 2>/dev/null && \
         log "  ✓ MariaDB: all databases" || \
         err "  ✗ MariaDB dump failed"
@@ -57,11 +61,13 @@ backup_mariadb() {
 # ──────────────────────────────────────────────
 backup_mongodb() {
     log "Dumping MongoDB..."
-    docker compose -f "${OFICINA_DIR}/docker-compose.yml" \
-        exec -T mongodb mongodump \
-        -u "${MONGO_USER}" -p "${MONGO_PASSWORD}" \
-        --authenticationDatabase admin \
-        --archive --gzip \
+    # Build the connection URI inside the container so the password never
+    # appears in host argv. `-e MONGO_URI` (no value) inherits from the
+    # exported parent env.
+    MONGO_URI="mongodb://${MONGO_USER}:${MONGO_PASSWORD}@localhost/?authSource=admin" \
+        docker compose -f "${OFICINA_DIR}/docker-compose.yml" \
+        exec -T -e MONGO_URI mongodb \
+        sh -c 'mongodump --uri "$MONGO_URI" --archive --gzip' \
         > "${BACKUP_DIR}/mongodb_all.archive.gz" 2>/dev/null && \
         log "  ✓ MongoDB: all databases" || \
         err "  ✗ MongoDB dump failed"

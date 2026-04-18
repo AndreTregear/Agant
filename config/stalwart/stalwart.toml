@@ -4,7 +4,7 @@
 # ╚══════════════════════════════════════════════════════════════════╝
 
 [server]
-hostname = "mail.oficina.local"
+hostname = "%{env:STALWART_HOSTNAME}%"
 max-connections = 1024
 
 # ──────────────────────────────────────────────
@@ -23,14 +23,15 @@ bind = ["0.0.0.0:993"]
 protocol = "imap"
 tls.implicit = true
 
-[server.listener.imap]
-bind = ["0.0.0.0:143"]
-protocol = "imap"
+# Plaintext IMAP (143) intentionally disabled: clients must use implicit
+# TLS on 993 or submission/STARTTLS on 587. Re-enable only with STARTTLS
+# enforced and behind a VPN.
 
 [server.listener.http]
 bind = ["0.0.0.0:8080"]
 protocol = "http"
-# Serves: webmail, JMAP, admin panel, ManageSieve, OAuth
+# Serves: webmail, JMAP, admin panel, ManageSieve, OAuth.
+# Only reachable via Caddy; host port is bound to 127.0.0.1 in compose.
 
 # ──────────────────────────────────────────────
 # Storage (embedded RocksDB for simplicity)
@@ -52,9 +53,9 @@ directory = "oidc"
 # ──────────────────────────────────────────────
 [directory."oidc"]
 type = "oidc"
-issuer-url = "https://auth.oficina.local/application/o/stalwart/"
-client-id = "stalwart-client"
-client-secret = "change-me-stalwart"
+issuer-url = "%{env:STALWART_OIDC_ISSUER_URL}%"
+client-id = "%{env:STALWART_OIDC_CLIENT_ID}%"
+client-secret = "%{env:STALWART_OIDC_SECRET}%"
 # Map Authentik claims to Stalwart user fields
 claims.name = "name"
 claims.email = "email"
@@ -74,7 +75,7 @@ relay = false
 max-recipients = 100
 
 [queue.outbound]
-hostname = "mail.oficina.local"
+hostname = "%{env:STALWART_HOSTNAME}%"
 
 # ──────────────────────────────────────────────
 # JMAP configuration (for AI agent access)

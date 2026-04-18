@@ -77,6 +77,12 @@ export function createN8nConnector(config: N8nConfig): Connector<N8nActions> {
     },
 
     async triggerWebhook(webhookPath, data) {
+      // Allow only the characters n8n itself permits in webhook paths so a
+      // caller can't smuggle `../` or `?` to reach arbitrary endpoints on
+      // the n8n host.
+      if (!/^[A-Za-z0-9._/-]+$/.test(webhookPath) || webhookPath.includes('..')) {
+        throw new Error(`n8n: invalid webhook path: ${webhookPath}`);
+      }
       return httpJson(http, 'POST', `/webhook/${webhookPath}`, data || {});
     },
 

@@ -4,7 +4,7 @@
 
 services:
   ragflow:
-    image: infiniflow/ragflow:latest
+    image: infiniflow/ragflow:v0.16.0
     restart: unless-stopped
     environment:
       # Elasticsearch backend

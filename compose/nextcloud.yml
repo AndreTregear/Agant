@@ -23,9 +23,10 @@ services:
       OVERWRITEPROTOCOL: https
       OVERWRITEHOST: "files.${DOMAIN:-oficina.local}"
       TRUSTED_PROXIES: caddy
-      # PHP tuning
+      # PHP tuning. Default quota of 2G matches the request_body cap in
+      # Caddy; operators can raise via PHP_UPLOAD_LIMIT + Caddyfile.
       PHP_MEMORY_LIMIT: 1G
-      PHP_UPLOAD_LIMIT: 10G
+      PHP_UPLOAD_LIMIT: ${NEXTCLOUD_UPLOAD_LIMIT:-2G}
     volumes:
       - ${DATA_DIR}/nextcloud/html:/var/www/html
       - ${DATA_DIR}/nextcloud/data:/var/www/html/data
@@ -76,7 +77,7 @@ services:
   # Collabora Online — LibreOffice in the browser
   # ─────────────────────────────────────────────────────────────
   collabora:
-    image: collabora/code:latest
+    image: collabora/code:24.04.12.1.1
     restart: unless-stopped
     environment:
       - "aliasgroup1=https://files.${DOMAIN:-oficina.local}"

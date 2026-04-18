@@ -8,7 +8,7 @@ services:
   # OpenAI-compatible API at :8000/v1
   # ─────────────────────────────────────────────────────────────
   vllm:
-    image: vllm/vllm-openai:latest
+    image: vllm/vllm-openai:v0.6.6
     restart: unless-stopped
     command:
       - --model=${VLLM_MODEL:-Qwen/Qwen2.5-32B-Instruct-AWQ}
@@ -21,8 +21,9 @@ services:
       - --port=8000
     environment:
       HF_HOME: /models
-      # For air-gapped: pre-download models to data/vllm-models
-      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-0}
+      # Default to air-gapped: fail fast if the model isn't pre-downloaded
+      # to data/vllm-models rather than silently phoning home to HF Hub.
+      HF_HUB_OFFLINE: ${HF_HUB_OFFLINE:-1}
     volumes:
       - ${DATA_DIR}/vllm-models:/models
     ports:
@@ -53,7 +54,7 @@ services:
   # Faster Whisper server, OpenAI-compatible API
   # ─────────────────────────────────────────────────────────────
   whisper:
-    image: fedirz/faster-whisper-server:latest-cuda
+    image: fedirz/faster-whisper-server:2.1.0-cuda
     restart: unless-stopped
     environment:
       WHISPER__MODEL: large-v3-turbo
@@ -88,7 +89,7 @@ services:
   # Fast multilingual synthesis with Spanish voice
   # ─────────────────────────────────────────────────────────────
   kokoro-tts:
-    image: ghcr.io/remsky/kokoro-fastapi:latest
+    image: ghcr.io/remsky/kokoro-fastapi:v0.2.4
     restart: unless-stopped
     environment:
       DEFAULT_VOICE: ef_dora

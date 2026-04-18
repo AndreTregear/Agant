@@ -36,6 +36,15 @@ async function ocsGet<T>(http: HttpClientConfig, path: string): Promise<T> {
   return resp.ocs.data;
 }
 
+function escapeXml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+}
+
 async function webdavPropfind(http: HttpClientConfig, path: string, depth = 1): Promise<string> {
   return httpText(http, 'PROPFIND', `/remote.php/dav/${path}`,
     `<?xml version="1.0"?>
@@ -97,14 +106,15 @@ export function createNextcloudConnector(config: NextcloudConfig): Connector<Nex
     },
 
     async searchFiles(query) {
-      // Use WebDAV SEARCH
+      const safeQuery = escapeXml(query);
+      const safeUser = escapeXml(config.username);
       const xml = await httpText(http, 'SEARCH', `/remote.php/dav/`,
         `<?xml version="1.0"?>
         <d:searchrequest xmlns:d="DAV:" xmlns:oc="http://owncloud.org/ns">
           <d:basicsearch>
             <d:select><d:prop><d:displayname/><d:getcontenttype/><d:getlastmodified/><oc:fileid/></d:prop></d:select>
-            <d:from><d:scope><d:href>/files/${config.username}</d:href><d:depth>infinity</d:depth></d:scope></d:from>
-            <d:where><d:like><d:prop><d:displayname/></d:prop><d:literal>%${query}%</d:literal></d:like></d:where>
+            <d:from><d:scope><d:href>/files/${safeUser}</d:href><d:depth>infinity</d:depth></d:scope></d:from>
+            <d:where><d:like><d:prop><d:displayname/></d:prop><d:literal>%${safeQuery}%</d:literal></d:like></d:where>
             <d:limit><d:nresults>50</d:nresults></d:limit>
           </d:basicsearch>
         </d:searchrequest>`,
@@ -118,7 +128,7 @@ export function createNextcloudConnector(config: NextcloudConfig): Connector<Nex
       const now = new Date();
       const future = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
       return httpText(http, 'REPORT',
-        `/remote.php/dav/calendars/${config.username}/${calendarName}`,
+        `/remote.php/dav/calendars/${encodeURIComponent(config.username)}/${encodeURIComponent(calendarName)}`,
         `<?xml version="1.0"?>
         <c:calendar-query xmlns:d="DAV:" xmlns:c="urn:ietf:params:xml:ns:caldav">
           <d:prop><d:getetag/><c:calendar-data/></d:prop>

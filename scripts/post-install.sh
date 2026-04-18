@@ -63,10 +63,18 @@ generate_oidc_secrets() {
     )
 
     for secret_name in "${secrets[@]}"; do
-        if ! grep -q "^${secret_name}=" "$env_file" 2>/dev/null; then
+        local existing
+        existing=$(grep "^${secret_name}=" "$env_file" 2>/dev/null | head -1 | cut -d= -f2-)
+        # Treat empty values and CHANGE_ME_* placeholders as unset.
+        if [ -z "$existing" ] || [[ "$existing" == CHANGE_ME_* ]]; then
+            # 48 base64 chars after stripping /+= ≈ 288 bits of entropy.
             local secret_value
-            secret_value=$(openssl rand -base64 32 | tr -d '/+=' | head -c 40)
-            echo "${secret_name}=${secret_value}" >> "$env_file"
+            secret_value=$(openssl rand -base64 64 | tr -d '/+=' | head -c 48)
+            if grep -q "^${secret_name}=" "$env_file" 2>/dev/null; then
+                sed -i "s|^${secret_name}=.*|${secret_name}=${secret_value}|" "$env_file"
+            else
+                echo "${secret_name}=${secret_value}" >> "$env_file"
+            fi
             log "  Generated ${secret_name}"
         else
             log "  ${secret_name} already exists"
@@ -77,20 +85,9 @@ generate_oidc_secrets() {
     source "$env_file"
 }
 
-# ──────────────────────────────────────────────
-# Update Stalwart config with actual secrets
-# ──────────────────────────────────────────────
-configure_stalwart_secrets() {
-    step "Configuring Stalwart Mail"
-
-    local config="${OFICINA_DIR}/config/stalwart/stalwart.toml"
-    if [ -f "$config" ]; then
-        sed -i "s|client-secret = \"change-me-stalwart\"|client-secret = \"${STALWART_OIDC_SECRET}\"|" "$config"
-        sed -i "s|hostname = \"mail.oficina.local\"|hostname = \"mail.${DOMAIN:-oficina.local}\"|" "$config"
-        sed -i "s|issuer-url = \"https://auth.oficina.local|issuer-url = \"https://auth.${DOMAIN:-oficina.local}|" "$config"
-        log "Stalwart config updated with secrets"
-    fi
-}
+# Stalwart now reads its OIDC client-id/secret, hostname, and issuer URL
+# directly from env vars (see compose/mail.yml + config/stalwart/stalwart.toml).
+# No in-place sed required.
 
 # ──────────────────────────────────────────────
 # Import n8n workflows
@@ -142,29 +139,34 @@ configure_superset_databases() {
         return 1
     fi
 
-    # Add ERPNext MariaDB as data source
-    log "  Adding ERPNext (MariaDB) data source..."
-    curl -sf "${superset_url}/api/v1/database/" \
-        -H "Authorization: Bearer ${access_token}" \
-        -H "Content-Type: application/json" \
-        -d "{
-            \"database_name\": \"ERPNext\",
-            \"sqlalchemy_uri\": \"mysql://root:${MARIADB_ROOT_PASSWORD}@mariadb:3306/erpnext\",
-            \"expose_in_sqllab\": true,
-            \"allow_run_async\": true
-        }" >/dev/null 2>&1 && log "    ✓ ERPNext" || warn "    ⚠ ERPNext"
+    # Connect Superset to MariaDB through the SELECT-only superset_read
+    # user provisioned by init-users.sh. Root credentials never leave the
+    # DB container.
+    if [ -z "${SUPERSET_READ_PASSWORD:-}" ]; then
+        warn "SUPERSET_READ_PASSWORD not set; skipping MariaDB data sources"
+    else
+        log "  Adding ERPNext (MariaDB) data source..."
+        curl -sf "${superset_url}/api/v1/database/" \
+            -H "Authorization: Bearer ${access_token}" \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"database_name\": \"ERPNext\",
+                \"sqlalchemy_uri\": \"mysql://superset_read:${SUPERSET_READ_PASSWORD}@mariadb:3306/erpnext\",
+                \"expose_in_sqllab\": true,
+                \"allow_run_async\": true
+            }" >/dev/null 2>&1 && log "    ✓ ERPNext" || warn "    ⚠ ERPNext"
 
-    # Add WordPress/WooCommerce MariaDB
-    log "  Adding WooCommerce (MariaDB) data source..."
-    curl -sf "${superset_url}/api/v1/database/" \
-        -H "Authorization: Bearer ${access_token}" \
-        -H "Content-Type: application/json" \
-        -d "{
-            \"database_name\": \"WooCommerce\",
-            \"sqlalchemy_uri\": \"mysql://root:${MARIADB_ROOT_PASSWORD}@mariadb:3306/wordpress\",
-            \"expose_in_sqllab\": true,
-            \"allow_run_async\": true
-        }" >/dev/null 2>&1 && log "    ✓ WooCommerce" || warn "    ⚠ WooCommerce"
+        log "  Adding WooCommerce (MariaDB) data source..."
+        curl -sf "${superset_url}/api/v1/database/" \
+            -H "Authorization: Bearer ${access_token}" \
+            -H "Content-Type: application/json" \
+            -d "{
+                \"database_name\": \"WooCommerce\",
+                \"sqlalchemy_uri\": \"mysql://superset_read:${SUPERSET_READ_PASSWORD}@mariadb:3306/wordpress\",
+                \"expose_in_sqllab\": true,
+                \"allow_run_async\": true
+            }" >/dev/null 2>&1 && log "    ✓ WooCommerce" || warn "    ⚠ WooCommerce"
+    fi
 
     # Add agente-ceo PostgreSQL
     log "  Adding agente-ceo (PostgreSQL) data source..."
@@ -189,9 +191,8 @@ main() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo ""
 
-    # Step 0: Generate OIDC secrets and update configs
+    # Step 0: Generate OIDC secrets
     generate_oidc_secrets
-    configure_stalwart_secrets
 
     # Step 1: Wait for foundation services
     step "Checking Foundation Services"

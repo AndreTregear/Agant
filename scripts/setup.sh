@@ -105,6 +105,15 @@ generate_env() {
         "CHANGE_ME_superset_secret:$(gen_secret 42)"
         "CHANGE_ME_superset:$(gen_secret 24)"
         "CHANGE_ME_n8n_encryption:$(gen_secret 32)"
+        "CHANGE_ME_n8n_webhook_token:$(gen_secret 40)"
+        "CHANGE_ME_wordpress_db:$(gen_secret 24)"
+        "CHANGE_ME_superset_read:$(gen_secret 24)"
+        "CHANGE_ME_stalwart_oidc:$(gen_secret 40)"
+        "CHANGE_ME_jibri_xmpp:$(gen_secret 24)"
+        "CHANGE_ME_jibri_recorder:$(gen_secret 24)"
+        "CHANGE_ME_jicofo_auth:$(gen_secret 24)"
+        "CHANGE_ME_jvb_auth:$(gen_secret 24)"
+        "CHANGE_ME_jibri_nextcloud:$(gen_secret 24)"
         "CHANGE_ME_oidc_client_id:$(gen_secret 20)"
         "CHANGE_ME_oidc_client_secret:$(gen_secret 40)"
     )
@@ -115,8 +124,30 @@ generate_env() {
         sed -i "s|${placeholder}|${secret}|g" "$ENV_FILE"
     done
 
-    log "Secrets generated and written to .env"
+    chmod 600 "$ENV_FILE"
+    log "Secrets generated and written to .env (mode 600)"
     log "IMPORTANT: Back up .env — losing it means losing access to all services."
+}
+
+# ──────────────────────────────────────────────
+# Generate MongoDB replica set keyfile on first boot.
+# Without this, mongod --replSet fails to start.
+# ──────────────────────────────────────────────
+generate_mongo_keyfile() {
+    local data_dir="${OFICINA_DIR}/data"
+    local keyfile="${data_dir}/mongodb/mongo-keyfile"
+
+    if [ -s "$keyfile" ]; then
+        return
+    fi
+
+    log "Generating MongoDB replica set keyfile..."
+    mkdir -p "$(dirname "$keyfile")"
+    openssl rand -base64 756 > "$keyfile"
+    chmod 400 "$keyfile"
+    # mongod enforces that the keyfile is owned by the mongod user inside
+    # the container (uid 999 in the official image).
+    chown 999:999 "$keyfile" 2>/dev/null || true
 }
 
 # ──────────────────────────────────────────────
@@ -264,6 +295,7 @@ main() {
 
     check_prereqs
     generate_env
+    generate_mongo_keyfile
     configure
     start_services
 }

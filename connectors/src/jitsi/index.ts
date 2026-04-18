@@ -80,7 +80,7 @@ export function createJitsiConnector(config: JitsiConfig): Connector<JitsiAction
     async listRecordings() {
       try {
       const xml = await httpText(ncHttp, 'PROPFIND',
-        `/remote.php/dav/files/${config.nextcloudUser}/Recordings/`,
+        `/remote.php/dav/files/${encodeURIComponent(config.nextcloudUser)}/Recordings/`,
         `<?xml version="1.0"?>
         <d:propfind xmlns:d="DAV:">
           <d:prop>

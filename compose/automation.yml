@@ -4,7 +4,8 @@
 
 services:
   n8n:
-    image: n8nio/n8n:latest
+    # Pinned. Bump deliberately after reviewing release notes + security advisories.
+    image: n8nio/n8n:1.70.1
     restart: unless-stopped
     environment:
       # Database
@@ -64,7 +65,7 @@ services:
 
   # n8n worker (processes queued executions)
   n8n-worker:
-    image: n8nio/n8n:latest
+    image: n8nio/n8n:1.70.1
     restart: unless-stopped
     command: worker
     environment:
