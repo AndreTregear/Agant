@@ -11,6 +11,7 @@ const ERP_SECRET = process.env.ERP_SECRET || '';
 const NC_PASS = process.env.NC_PASS || 'admin';
 const STALWART_PASS = process.env.STALWART_PASS || 'admin';
 const N8N_KEY = process.env.N8N_KEY || '';
+const JITSI_URL = process.env.JITSI_URL || 'http://localhost:8000';
 
 async function main() {
   console.log('╔═══════════════════════════════════════════════╗');
@@ -27,6 +28,7 @@ async function main() {
     nextcloud: { baseUrl: 'http://localhost:8081', username: 'admin', password: NC_PASS },
     stalwart: { baseUrl: 'http://localhost:8082', username: 'admin', password: STALWART_PASS },
     n8n: { baseUrl: 'http://localhost:5678', apiKey: N8N_KEY },
+    jitsi: { baseUrl: JITSI_URL, domain: 'meet.oficina.local', nextcloudUrl: 'http://localhost:8081', nextcloudUser: 'admin', nextcloudPassword: NC_PASS },
   });
 
   let pass = 0;
@@ -81,14 +83,25 @@ async function main() {
     check(`getInbox (${inbox.length} emails)`, true);
   } catch (e: any) { check(`getInbox: ${e.message.slice(0, 80)}`, false); }
 
-  // 5. n8n
+  // 5. Jitsi
+  console.log('\n=== Jitsi Meet ===');
+  try {
+    const link = oficina.meetings.actions.createRoomLink('daily-standup');
+    check(`createRoomLink → ${link}`, link.includes('daily-standup'));
+  } catch (e: any) { check(`createRoomLink: ${e.message.slice(0, 80)}`, false); }
+  try {
+    const recordings = await oficina.meetings.actions.listRecordings();
+    check(`listRecordings (${recordings.length} recordings)`, true);
+  } catch (e: any) { check(`listRecordings: ${e.message.slice(0, 80)}`, false); }
+
+  // 6. n8n
   console.log('\n=== n8n ===');
   try {
     const workflows = await oficina.n8n.actions.listWorkflows();
     check(`listWorkflows (${workflows.length} workflows)`, true);
   } catch (e: any) { check(`listWorkflows: ${e.message.slice(0, 80)}`, false); }
 
-  // 6. Full extraction + search
+  // 7. Full extraction + search
   console.log('\n=== Data Indexer ===');
   try {
     const result = await oficina.extractAll();

@@ -9,6 +9,7 @@
  *   const oficina = createOficina()
  *   await oficina.erpnext.actions.listCustomers("Garcia")
  *   await oficina.mail.actions.sendEmail({ to: "...", subject: "...", textBody: "..." })
+ *   await oficina.meetings.actions.createRoomLink("standup")
  *   await oficina.indexer.search("facturas pendientes")
  */
 
@@ -17,20 +18,23 @@ export { createERPNextConnector, type ERPNextActions, type ERPNextConfig } from 
 export { createNextcloudConnector, type NextcloudActions, type NextcloudConfig } from './nextcloud';
 export { createStalwartConnector, type StalwartActions, type StalwartConfig } from './stalwart';
 export { createN8nConnector, type N8nActions, type N8nConfig } from './n8n';
+export { createJitsiConnector, type JitsiActions, type JitsiConfig } from './jitsi';
 export { DataIndexer, type IndexerConfig } from './indexer';
 
 import { createERPNextConnector } from './erpnext';
 import { createNextcloudConnector } from './nextcloud';
 import { createStalwartConnector } from './stalwart';
 import { createN8nConnector } from './n8n';
+import { createJitsiConnector } from './jitsi';
 import { DataIndexer } from './indexer';
-import type { Connector, ERPNextActions, NextcloudActions, StalwartActions, N8nActions } from './index';
+import type { Connector, ERPNextActions, NextcloudActions, StalwartActions, N8nActions, JitsiActions } from './index';
 
 export interface Oficina {
   erpnext: Connector<ERPNextActions>;
   nextcloud: Connector<NextcloudActions>;
   mail: Connector<StalwartActions>;
   n8n: Connector<N8nActions>;
+  meetings: Connector<JitsiActions>;
   indexer: DataIndexer;
 
   /** Health check all services */
@@ -45,6 +49,7 @@ export interface OficinaConfig {
   nextcloud?: { baseUrl: string; username: string; password: string };
   stalwart?: { baseUrl: string; username: string; password: string };
   n8n?: { baseUrl: string; apiKey?: string };
+  jitsi?: { baseUrl: string; domain?: string; nextcloudUrl?: string; nextcloudUser?: string; nextcloudPassword?: string };
   indexer?: { pollIntervalMs?: number; onRecord?: (record: any) => Promise<void> };
 }
 
@@ -53,6 +58,10 @@ export interface OficinaConfig {
  * Reads config from the argument or falls back to environment variables.
  */
 export function createOficina(config?: OficinaConfig): Oficina {
+  const ncUrl = config?.nextcloud?.baseUrl || process.env.NEXTCLOUD_URL || 'http://nextcloud';
+  const ncUser = config?.nextcloud?.username || process.env.NEXTCLOUD_USER || 'admin';
+  const ncPass = config?.nextcloud?.password || process.env.NEXTCLOUD_PASSWORD || '';
+
   const erpnext = createERPNextConnector(config?.erpnext || {
     baseUrl: process.env.ERPNEXT_URL || 'http://erpnext:8000',
     apiKey: process.env.ERPNEXT_API_KEY,
@@ -61,9 +70,7 @@ export function createOficina(config?: OficinaConfig): Oficina {
   });
 
   const nextcloud = createNextcloudConnector(config?.nextcloud || {
-    baseUrl: process.env.NEXTCLOUD_URL || 'http://nextcloud',
-    username: process.env.NEXTCLOUD_USER || 'admin',
-    password: process.env.NEXTCLOUD_PASSWORD || '',
+    baseUrl: ncUrl, username: ncUser, password: ncPass,
   });
 
   const mail = createStalwartConnector(config?.stalwart || {
@@ -77,31 +84,43 @@ export function createOficina(config?: OficinaConfig): Oficina {
     apiKey: process.env.N8N_API_KEY,
   });
 
+  const meetings = createJitsiConnector({
+    baseUrl: config?.jitsi?.baseUrl || process.env.JITSI_URL || 'http://jitsi-web',
+    domain: config?.jitsi?.domain || process.env.JITSI_DOMAIN || 'meet.oficina.local',
+    nextcloudUrl: config?.jitsi?.nextcloudUrl || ncUrl,
+    nextcloudUser: config?.jitsi?.nextcloudUser || ncUser,
+    nextcloudPassword: config?.jitsi?.nextcloudPassword || ncPass,
+  });
+
   const indexer = new DataIndexer(config?.indexer);
   indexer.addConnector(erpnext);
   indexer.addConnector(nextcloud);
   indexer.addConnector(mail);
   indexer.addConnector(n8n);
+  indexer.addConnector(meetings);
 
   return {
     erpnext,
     nextcloud,
     mail,
     n8n,
+    meetings,
     indexer,
 
     async healthCheckAll() {
-      const [erp, nc, st, n8] = await Promise.allSettled([
+      const [erp, nc, st, n8, jt] = await Promise.allSettled([
         erpnext.healthCheck(),
         nextcloud.healthCheck(),
         mail.healthCheck(),
         n8n.healthCheck(),
+        meetings.healthCheck(),
       ]);
       return {
         erpnext: erp.status === 'fulfilled' && erp.value,
         nextcloud: nc.status === 'fulfilled' && nc.value,
         stalwart: st.status === 'fulfilled' && st.value,
         n8n: n8.status === 'fulfilled' && n8.value,
+        jitsi: jt.status === 'fulfilled' && jt.value,
       };
     },
 

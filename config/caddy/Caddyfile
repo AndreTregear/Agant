@@ -94,6 +94,19 @@ chat.{$DOMAIN:oficina.local} {
 }
 
 # ──────────────────────────────────────────────
+# Jitsi Meet — Video Conferencing + Recording
+# ──────────────────────────────────────────────
+meet.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy jitsi-web:443 {
+		transport http {
+			tls_insecure_skip_verify
+		}
+	}
+}
+
+# ──────────────────────────────────────────────
 # Stalwart — Email (webmail interface)
 # ──────────────────────────────────────────────
 mail.{$DOMAIN:oficina.local} {
