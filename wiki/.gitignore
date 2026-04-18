@@ -1,0 +1,7 @@
+.venv/
+raw/
+wiki/
+last_response.txt
+tts_*.wav
+*.pyc
+__pycache__/
