@@ -1,0 +1,176 @@
+{
+  "name": "Oficina: Document Indexing (Nextcloud → RAGFlow)",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "nextcloud-file-event",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Nextcloud File Event",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "file.created",
+              "operator": { "type": "string", "operation": "equals" }
+            },
+            {
+              "leftValue": "={{ $json.event }}",
+              "rightValue": "file.updated",
+              "operator": { "type": "string", "operation": "equals" }
+            }
+          ]
+        }
+      },
+      "id": "filter-events",
+      "name": "Filter: Only New/Updated Files",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false
+          },
+          "combinator": "or",
+          "conditions": [
+            {
+              "leftValue": "={{ $json.file_path }}",
+              "rightValue": ".pdf",
+              "operator": { "type": "string", "operation": "endsWith" }
+            },
+            {
+              "leftValue": "={{ $json.file_path }}",
+              "rightValue": ".docx",
+              "operator": { "type": "string", "operation": "endsWith" }
+            },
+            {
+              "leftValue": "={{ $json.file_path }}",
+              "rightValue": ".xlsx",
+              "operator": { "type": "string", "operation": "endsWith" }
+            },
+            {
+              "leftValue": "={{ $json.file_path }}",
+              "rightValue": ".txt",
+              "operator": { "type": "string", "operation": "endsWith" }
+            },
+            {
+              "leftValue": "={{ $json.file_path }}",
+              "rightValue": ".md",
+              "operator": { "type": "string", "operation": "endsWith" }
+            }
+          ]
+        }
+      },
+      "id": "filter-filetypes",
+      "name": "Filter: Supported File Types",
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://nextcloud/remote.php/dav/files/admin/{{ $json.file_path }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "download-file",
+      "name": "Download File from Nextcloud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ragflow:8080/api/v1/datasets/default/documents",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "contentType": "multipartFormData",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "upload-to-ragflow",
+      "name": "Index in RAGFlow",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1130, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://ragflow:8080/api/v1/datasets/default/documents/{{ $json.id }}/chunks",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "trigger-chunking",
+      "name": "Trigger Document Chunking",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1350, 300]
+    }
+  ],
+  "connections": {
+    "Nextcloud File Event": {
+      "main": [
+        [{ "node": "Filter: Only New/Updated Files", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter: Only New/Updated Files": {
+      "main": [
+        [{ "node": "Filter: Supported File Types", "type": "main", "index": 0 }]
+      ]
+    },
+    "Filter: Supported File Types": {
+      "main": [
+        [{ "node": "Download File from Nextcloud", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download File from Nextcloud": {
+      "main": [
+        [{ "node": "Index in RAGFlow", "type": "main", "index": 0 }]
+      ]
+    },
+    "Index in RAGFlow": {
+      "main": [
+        [{ "node": "Trigger Document Chunking", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "oficina" }, { "name": "rag" }, { "name": "documents" }]
+}

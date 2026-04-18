@@ -1,0 +1,99 @@
+{
+  "name": "Oficina: Customer Onboarding",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "customer-created",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "New Customer Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "MKCOL",
+        "url": "=http://nextcloud/remote.php/dav/files/admin/Empresa/Clientes/{{ $json.customer_name }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": { "redirect": { "redirect": { "followRedirects": false } } }
+      },
+      "id": "create-folder",
+      "name": "Create Nextcloud Folder",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://rocketchat:3000/api/v1/channels.create",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"name\": \"cliente-{{ $json.customer_name.toLowerCase().replace(/\\s+/g, '-') }}\", \"members\": [] }"
+      },
+      "id": "create-channel",
+      "name": "Create Chat Channel",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://zammad:8080/api/v1/users",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"firstname\": \"{{ $json.customer_name.split(' ')[0] }}\", \"lastname\": \"{{ $json.customer_name.split(' ').slice(1).join(' ') }}\", \"email\": \"{{ $json.email }}\", \"roles\": [\"Customer\"] }"
+      },
+      "id": "create-helpdesk-user",
+      "name": "Create Zammad Customer",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 600]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://rocketchat:3000/api/v1/chat.sendMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"message\": { \"rid\": \"ventas\", \"msg\": \"🆕 Nuevo cliente registrado: *{{ $json.customer_name }}* ({{ $json.email }})\\nCarpeta: Empresa/Clientes/{{ $json.customer_name }}\\nCanal: #cliente-{{ $json.customer_name.toLowerCase().replace(/\\\\s+/g, '-') }}\" } }"
+      },
+      "id": "notify-team",
+      "name": "Notify Sales Team",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [730, 400]
+    }
+  ],
+  "connections": {
+    "New Customer Webhook": {
+      "main": [
+        [
+          { "node": "Create Nextcloud Folder", "type": "main", "index": 0 },
+          { "node": "Create Chat Channel", "type": "main", "index": 0 },
+          { "node": "Create Zammad Customer", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Create Chat Channel": {
+      "main": [
+        [{ "node": "Notify Sales Team", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "oficina" }, { "name": "onboarding" }, { "name": "crm" }]
+}

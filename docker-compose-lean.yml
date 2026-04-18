@@ -1,0 +1,12 @@
+# Oficina Digital — LEAN DEMO STACK
+# PostgreSQL + MariaDB + Redis | Authentik SSO | Caddy
+# ERPNext | Nextcloud | Stalwart Mail | n8n
+
+include:
+  - path: compose/foundation-lean.yml
+  - path: compose/identity.yml
+  - path: compose/proxy.yml
+  - path: compose/erp-lean.yml
+  - path: compose/nextcloud-lean.yml
+  - path: compose/mail.yml
+  - path: compose/automation-lean.yml

@@ -1,0 +1,455 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  Oficina Digital — Authentik SSO Blueprint                      ║
+# ║  Auto-configures OIDC providers for all services.               ║
+# ║  Loaded on Authentik startup via /blueprints/ volume mount.     ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# Authentik Blueprint API v1
+# Docs: https://goauthentik.io/docs/developer-docs/blueprints/
+
+version: 1
+metadata:
+  name: Oficina Digital SSO
+  labels:
+    oficina/managed: "true"
+
+# ──────────────────────────────────────────────
+# Certificate/Key pair for signing tokens
+# ──────────────────────────────────────────────
+entries:
+  - model: authentik_crypto.certificatekeypair
+    id: oficina-signing-key
+    attrs:
+      name: oficina-signing-keypair
+      # Auto-generated self-signed cert on first import
+    state: present
+    conditions: []
+
+  # ──────────────────────────────────────────────
+  # Scopes (property mappings)
+  # ──────────────────────────────────────────────
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-openid
+    attrs:
+      name: "OpenID Connect scope: openid"
+      scope_name: openid
+      expression: |
+        return {
+          "sub": request.user.uid,
+        }
+    state: present
+
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-email
+    attrs:
+      name: "OpenID Connect scope: email"
+      scope_name: email
+      expression: |
+        return {
+          "email": request.user.email,
+          "email_verified": True,
+        }
+    state: present
+
+  - model: authentik_providers_oauth2.scopemapping
+    id: scope-profile
+    attrs:
+      name: "OpenID Connect scope: profile"
+      scope_name: profile
+      expression: |
+        return {
+          "name": request.user.name,
+          "given_name": request.user.name.split(" ")[0] if request.user.name else "",
+          "family_name": " ".join(request.user.name.split(" ")[1:]) if request.user.name else "",
+          "preferred_username": request.user.username,
+          "nickname": request.user.username,
+          "groups": [group.name for group in request.user.ak_groups.all()],
+        }
+    state: present
+
+  # ──────────────────────────────────────────────
+  # Authorization flow
+  # ──────────────────────────────────────────────
+  - model: authentik_flows.flow
+    id: oficina-authorize-flow
+    attrs:
+      name: Oficina Authorize
+      title: Authorize Application
+      slug: oficina-authorize
+      designation: authorization
+      authentication: require_authenticated
+    state: present
+
+  - model: authentik_stages_consent.consentstage
+    id: oficina-consent-stage
+    attrs:
+      name: oficina-consent
+      mode: permanent  # Remember consent per app
+    state: present
+
+  - model: authentik_flows.flowstagebinding
+    id: oficina-authorize-binding
+    attrs:
+      target: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      stage: !Find [authentik_stages_consent.consentstage, [name, oficina-consent]]
+      order: 0
+    state: present
+
+  # ════════════════════════════════════════════════
+  # OIDC PROVIDERS — one per service
+  # ════════════════════════════════════════════════
+
+  # ── agente-ceo (AI Portal) ──────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-agente-ceo
+    identifiers:
+      name: agente-ceo
+    attrs:
+      name: agente-ceo
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: !Env [AGENTE_CEO_OIDC_CLIENT_ID, agente-ceo-client]
+      client_secret: !Env [AGENTE_CEO_OIDC_CLIENT_SECRET, change-me]
+      redirect_uris: |
+        https://!Env [DOMAIN, oficina.local]/api/auth/callback/authentik
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-agente-ceo
+    attrs:
+      name: "AI Portal"
+      slug: agente-ceo
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, agente-ceo]]
+      meta_launch_url: "https://!Env [DOMAIN, oficina.local]"
+      meta_icon: ""
+      policy_engine_mode: any
+    state: present
+
+  # ── ERPNext ─────────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-erpnext
+    identifiers:
+      name: erpnext
+    attrs:
+      name: erpnext
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: erpnext-client
+      client_secret: !Env [ERPNEXT_OIDC_SECRET, change-me-erpnext]
+      redirect_uris: |
+        https://erp.!Env [DOMAIN, oficina.local]/api/method/frappe.integrations.oauth2_logins.login_via_oauth2
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-erpnext
+    attrs:
+      name: "ERP"
+      slug: erpnext
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, erpnext]]
+      meta_launch_url: "https://erp.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── Nextcloud ───────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-nextcloud
+    identifiers:
+      name: nextcloud
+    attrs:
+      name: nextcloud
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: nextcloud-client
+      client_secret: !Env [NEXTCLOUD_OIDC_SECRET, change-me-nextcloud]
+      redirect_uris: |
+        https://files.!Env [DOMAIN, oficina.local]/apps/user_oidc/code
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-nextcloud
+    attrs:
+      name: "Files"
+      slug: nextcloud
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, nextcloud]]
+      meta_launch_url: "https://files.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── Rocket.Chat ─────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-rocketchat
+    identifiers:
+      name: rocketchat
+    attrs:
+      name: rocketchat
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: rocketchat-client
+      client_secret: !Env [ROCKETCHAT_OIDC_SECRET, change-me-rocketchat]
+      redirect_uris: |
+        https://chat.!Env [DOMAIN, oficina.local]/_oauth/authentik
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-rocketchat
+    attrs:
+      name: "Chat"
+      slug: rocketchat
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, rocketchat]]
+      meta_launch_url: "https://chat.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── Stalwart Mail ───────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-stalwart
+    identifiers:
+      name: stalwart
+    attrs:
+      name: stalwart
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: stalwart-client
+      client_secret: !Env [STALWART_OIDC_SECRET, change-me-stalwart]
+      redirect_uris: |
+        https://mail.!Env [DOMAIN, oficina.local]/auth/oauth
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-stalwart
+    attrs:
+      name: "Email"
+      slug: stalwart
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, stalwart]]
+      meta_launch_url: "https://mail.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── WordPress + WooCommerce ─────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-wordpress
+    identifiers:
+      name: wordpress
+    attrs:
+      name: wordpress
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: wordpress-client
+      client_secret: !Env [WORDPRESS_OIDC_SECRET, change-me-wordpress]
+      redirect_uris: |
+        https://www.!Env [DOMAIN, oficina.local]/wp-admin/admin-ajax.php?action=openid-connect-authorize
+        https://shop.!Env [DOMAIN, oficina.local]/wp-admin/admin-ajax.php?action=openid-connect-authorize
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-wordpress
+    attrs:
+      name: "Website & Shop"
+      slug: wordpress
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, wordpress]]
+      meta_launch_url: "https://www.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── Apache Superset ─────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-superset
+    identifiers:
+      name: superset
+    attrs:
+      name: superset
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: superset-client
+      client_secret: !Env [SUPERSET_OIDC_SECRET, change-me-superset]
+      redirect_uris: |
+        https://analytics.!Env [DOMAIN, oficina.local]/oauth-authorized/authentik
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-superset
+    attrs:
+      name: "Analytics"
+      slug: superset
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, superset]]
+      meta_launch_url: "https://analytics.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── Zammad ──────────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-zammad
+    identifiers:
+      name: zammad
+    attrs:
+      name: zammad
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: zammad-client
+      client_secret: !Env [ZAMMAD_OIDC_SECRET, change-me-zammad]
+      redirect_uris: |
+        https://help.!Env [DOMAIN, oficina.local]/auth/third_party/callback/openid_connect
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-zammad
+    attrs:
+      name: "Helpdesk"
+      slug: zammad
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, zammad]]
+      meta_launch_url: "https://help.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── n8n ─────────────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-n8n
+    identifiers:
+      name: n8n
+    attrs:
+      name: n8n
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: n8n-client
+      client_secret: !Env [N8N_OIDC_SECRET, change-me-n8n]
+      redirect_uris: |
+        https://auto.!Env [DOMAIN, oficina.local]/rest/oauth2-credential/callback
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-n8n
+    attrs:
+      name: "Automation"
+      slug: n8n
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, n8n]]
+      meta_launch_url: "https://auto.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── Portainer ───────────────────────────────
+  - model: authentik_providers_oauth2.oauth2provider
+    id: provider-portainer
+    identifiers:
+      name: portainer
+    attrs:
+      name: portainer
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      client_type: confidential
+      client_id: portainer-client
+      client_secret: !Env [PORTAINER_OIDC_SECRET, change-me-portainer]
+      redirect_uris: |
+        https://admin.!Env [DOMAIN, oficina.local]
+      signing_key: !Find [authentik_crypto.certificatekeypair, [name, oficina-signing-keypair]]
+      property_mappings:
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, openid]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, email]]
+        - !Find [authentik_providers_oauth2.scopemapping, [scope_name, profile]]
+    state: present
+
+  - model: authentik_core.application
+    id: app-portainer
+    attrs:
+      name: "Admin"
+      slug: portainer
+      provider: !Find [authentik_providers_oauth2.oauth2provider, [name, portainer]]
+      meta_launch_url: "https://admin.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ── RAGFlow (forward-auth outpost) ──────────
+  - model: authentik_providers_proxy.proxyprovider
+    id: provider-ragflow
+    identifiers:
+      name: ragflow
+    attrs:
+      name: ragflow
+      authorization_flow: !Find [authentik_flows.flow, [slug, oficina-authorize]]
+      mode: forward_single
+      external_host: "https://docs.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  - model: authentik_core.application
+    id: app-ragflow
+    attrs:
+      name: "Documents AI"
+      slug: ragflow
+      provider: !Find [authentik_providers_proxy.proxyprovider, [name, ragflow]]
+      meta_launch_url: "https://docs.!Env [DOMAIN, oficina.local]"
+    state: present
+
+  # ──────────────────────────────────────────────
+  # Groups — role-based access
+  # ──────────────────────────────────────────────
+  - model: authentik_core.group
+    id: group-admins
+    attrs:
+      name: oficina-admins
+      is_superuser: true
+    state: present
+
+  - model: authentik_core.group
+    id: group-managers
+    attrs:
+      name: oficina-managers
+      is_superuser: false
+    state: present
+
+  - model: authentik_core.group
+    id: group-employees
+    attrs:
+      name: oficina-employees
+      is_superuser: false
+    state: present
+
+  # ──────────────────────────────────────────────
+  # Embedded Outpost (for forward-auth / proxy)
+  # ──────────────────────────────────────────────
+  - model: authentik_outposts.outpost
+    id: oficina-outpost
+    identifiers:
+      name: oficina-embedded-outpost
+    attrs:
+      name: oficina-embedded-outpost
+      type: proxy
+      protocol_providers:
+        - !Find [authentik_providers_proxy.proxyprovider, [name, ragflow]]
+      config:
+        authentik_host: "https://auth.!Env [DOMAIN, oficina.local]"
+        docker_network: oficina-net
+    state: present

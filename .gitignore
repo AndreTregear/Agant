@@ -1,0 +1,17 @@
+# Data & secrets
+data/
+.env
+.env.*
+!.env.template
+.authentik_token
+.n8n_api_key
+.oidc_secrets
+
+# Node
+node_modules/
+dist/
+
+# OS
+.DS_Store
+*.swp
+*.swo

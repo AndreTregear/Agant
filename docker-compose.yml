@@ -1,0 +1,45 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  Oficina Digital — FOSS Office in a Box                         ║
+# ║  Root Docker Compose: imports all service modules                ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# Usage:
+#   Start everything:
+#     docker compose --profile foundation --profile identity --profile proxy \
+#       --profile erp --profile nextcloud --profile mail --profile chat \
+#       --profile wordpress --profile analytics --profile helpdesk \
+#       --profile automation --profile ai --profile rag --profile agent \
+#       --profile management up -d
+#
+#   Start minimal (foundation + AI agent only):
+#     docker compose --profile foundation --profile identity --profile proxy \
+#       --profile ai --profile agent up -d
+#
+#   Convenience: use scripts/start.sh which reads enabled profiles from .env
+#
+
+include:
+  # Layer 0: Foundation (always required)
+  - path: compose/foundation.yml
+  - path: compose/identity.yml
+  - path: compose/proxy.yml
+
+  # Layer 1: Core Business Apps
+  - path: compose/erp.yml
+  - path: compose/nextcloud.yml
+  - path: compose/mail.yml
+  - path: compose/chat.yml
+
+  # Layer 2: Extended Business Apps
+  - path: compose/wordpress.yml
+  - path: compose/analytics.yml
+  - path: compose/helpdesk.yml
+  - path: compose/automation.yml
+
+  # Layer 3: AI & Intelligence
+  - path: compose/ai.yml
+  - path: compose/rag.yml
+  - path: compose/agent.yml
+
+  # Management
+  - path: compose/management.yml

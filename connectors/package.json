@@ -1,0 +1,25 @@
+{
+  "name": "@oficina/connectors",
+  "version": "0.1.0",
+  "description": "Unified data access + action layer for Oficina Digital FOSS apps",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./erpnext": "./dist/erpnext/index.js",
+    "./nextcloud": "./dist/nextcloud/index.js",
+    "./stalwart": "./dist/stalwart/index.js",
+    "./n8n": "./dist/n8n/index.js",
+    "./indexer": "./dist/indexer/index.js",
+    "./types": "./dist/types.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "check": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.7.0",
+    "@types/node": "^22.0.0"
+  }
+}

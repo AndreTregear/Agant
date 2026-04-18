@@ -1,0 +1,101 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  Stalwart Mail Server — Oficina Digital Configuration           ║
+# ║  OIDC auth via Authentik, local domain, all protocols enabled.  ║
+# ╚══════════════════════════════════════════════════════════════════╝
+
+[server]
+hostname = "mail.oficina.local"
+max-connections = 1024
+
+# ──────────────────────────────────────────────
+# Listeners
+# ──────────────────────────────────────────────
+[server.listener.smtp]
+bind = ["0.0.0.0:25"]
+protocol = "smtp"
+
+[server.listener.submission]
+bind = ["0.0.0.0:587"]
+protocol = "smtp"
+
+[server.listener.imaps]
+bind = ["0.0.0.0:993"]
+protocol = "imap"
+tls.implicit = true
+
+[server.listener.imap]
+bind = ["0.0.0.0:143"]
+protocol = "imap"
+
+[server.listener.http]
+bind = ["0.0.0.0:8080"]
+protocol = "http"
+# Serves: webmail, JMAP, admin panel, ManageSieve, OAuth
+
+# ──────────────────────────────────────────────
+# Storage (embedded RocksDB for simplicity)
+# ──────────────────────────────────────────────
+[store."rocksdb"]
+type = "rocksdb"
+path = "/opt/stalwart/data"
+
+[storage]
+data = "rocksdb"
+fts = "rocksdb"
+blob = "rocksdb"
+lookup = "rocksdb"
+directory = "oidc"
+
+# ──────────────────────────────────────────────
+# Directory — Authentik OIDC
+# Stalwart authenticates users via Authentik's OIDC
+# ──────────────────────────────────────────────
+[directory."oidc"]
+type = "oidc"
+issuer-url = "https://auth.oficina.local/application/o/stalwart/"
+client-id = "stalwart-client"
+client-secret = "change-me-stalwart"
+# Map Authentik claims to Stalwart user fields
+claims.name = "name"
+claims.email = "email"
+claims.groups = "groups"
+# Auto-create accounts on first OIDC login
+auto-create = true
+
+# Fallback internal directory for admin
+[directory."internal"]
+type = "internal"
+
+# ──────────────────────────────────────────────
+# Domain configuration
+# ──────────────────────────────────────────────
+[session.rcpt]
+relay = false
+max-recipients = 100
+
+[queue.outbound]
+hostname = "mail.oficina.local"
+
+# ──────────────────────────────────────────────
+# JMAP configuration (for AI agent access)
+# ──────────────────────────────────────────────
+[jmap]
+max-size-upload = 52428800  # 50 MB
+max-objects-in-get = 500
+max-objects-in-set = 500
+
+# ──────────────────────────────────────────────
+# Spam filter (basic)
+# ──────────────────────────────────────────────
+[spam-filter]
+enabled = true
+threshold.spam = 5.0
+threshold.discard = 15.0
+
+# ──────────────────────────────────────────────
+# TLS — handled by Caddy reverse proxy
+# Internal listeners use plain, Caddy terminates TLS
+# ──────────────────────────────────────────────
+[certificate."default"]
+cert = "/opt/stalwart/etc/certs/fullchain.pem"
+private-key = "/opt/stalwart/etc/certs/privkey.pem"

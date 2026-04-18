@@ -1,0 +1,141 @@
+{
+  "name": "Oficina: Invoice Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "invoice-created",
+        "options": {}
+      },
+      "id": "webhook-trigger",
+      "name": "Invoice Created Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://erpnext-backend:8000/api/resource/Sales Invoice/{{ $json.invoice_name }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-invoice",
+      "name": "Get Invoice from ERPNext",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "=http://erpnext-backend:8000/api/method/frappe.utils.print_format.download_pdf?doctype=Sales Invoice&name={{ $json.data.name }}&format=Standard",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          }
+        }
+      },
+      "id": "get-invoice-pdf",
+      "name": "Download Invoice PDF",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [690, 300]
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "=http://nextcloud/remote.php/dav/files/admin/Empresa/Facturas/{{ $json.data.name }}.pdf",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "sendBody": true,
+        "contentType": "raw",
+        "body": "={{ $binary.data }}",
+        "options": {}
+      },
+      "id": "upload-to-nextcloud",
+      "name": "Upload PDF to Nextcloud",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 200]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://stalwart:8080/jmap",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "using",
+              "value": "=[\"urn:ietf:params:jmap:core\", \"urn:ietf:params:jmap:mail\"]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Email Invoice to Client",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [910, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://rocketchat:3000/api/v1/chat.sendMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "message",
+              "value": "={\"rid\": \"general\", \"msg\": \"📄 Factura {{ $json.data.name }} enviada a {{ $json.data.customer_name }} por {{ $json.data.grand_total }} {{ $json.data.currency }}\"}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "notify-rocketchat",
+      "name": "Notify Team in Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1130, 300]
+    }
+  ],
+  "connections": {
+    "Invoice Created Webhook": {
+      "main": [
+        [{ "node": "Get Invoice from ERPNext", "type": "main", "index": 0 }]
+      ]
+    },
+    "Get Invoice from ERPNext": {
+      "main": [
+        [{ "node": "Download Invoice PDF", "type": "main", "index": 0 }]
+      ]
+    },
+    "Download Invoice PDF": {
+      "main": [
+        [
+          { "node": "Upload PDF to Nextcloud", "type": "main", "index": 0 },
+          { "node": "Email Invoice to Client", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "Email Invoice to Client": {
+      "main": [
+        [{ "node": "Notify Team in Chat", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "oficina" }, { "name": "invoicing" }]
+}

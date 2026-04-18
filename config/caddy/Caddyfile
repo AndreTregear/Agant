@@ -1,0 +1,180 @@
+# Oficina Digital — Caddy Reverse Proxy
+#
+# Routes *.{$DOMAIN} subdomains to internal Docker services.
+# For air-gapped deployments: uses internal TLS with self-signed certs.
+# For internet-connected: swap tls internal → tls auto (Let's Encrypt).
+
+# Global options
+{
+	# Use internal CA for air-gapped (self-signed certs)
+	# Remove this block and use real domain for production with Let's Encrypt
+	local_certs
+	auto_https disable_redirects
+}
+
+# ──────────────────────────────────────────────
+# Authentik forward-auth snippet (reusable)
+# Used by services without native OIDC support
+# ──────────────────────────��───────────────────
+(authentik-forward-auth) {
+	forward_auth {$AUTHENTIK_HOST} {
+		uri /outpost.goauthentik.io/auth/caddy
+		copy_headers X-Authentik-Username X-Authentik-Groups X-Authentik-Email X-Authentik-Name X-Authentik-Uid
+		trusted_proxies private_ranges
+	}
+}
+
+# ──────────────────────────────────────────────
+# Security headers snippet
+# ──────────────────────────────────────────────
+(security-headers) {
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options SAMEORIGIN
+		Referrer-Policy strict-origin-when-cross-origin
+		X-XSS-Protection "1; mode=block"
+		-Server
+	}
+}
+
+# ──────────────────────────────────────────────
+# Portal — agente-ceo AI agent (main dashboard)
+# ──────────────────────────────────────────────
+{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+
+	# SSE endpoints need immediate flushing
+	@sse path /api/chat /api/voice/stream /api/voice/events /api/tasks/events
+	reverse_proxy @sse agente-ceo:3005 {
+		flush_interval -1
+	}
+
+	reverse_proxy agente-ceo:3005
+}
+
+# ──────────────────────────────────────────────
+# ERPNext — ERP / CRM / HR
+# ──────────────────────────────────────────────
+erp.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy erpnext-frontend:8080
+}
+
+# ──────────────────────────────────────────────
+# Nextcloud — Files / Calendar / Contacts
+# ──────────────────────────────────────────────
+files.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+
+	# WebDAV needs large uploads
+	request_body {
+		max_size 10G
+	}
+
+	reverse_proxy nextcloud:80
+}
+
+# ──────────────────────────────────────────────
+# Rocket.Chat — Team Chat / Video
+# ──────────────────────────────────────────────
+chat.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+
+	# WebSocket for real-time messaging
+	@websockets {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	reverse_proxy @websockets rocketchat:3000
+	reverse_proxy rocketchat:3000
+}
+
+# ──────────────────────────────────────────────
+# Stalwart — Email (webmail interface)
+# ──────────────────────────────────────────────
+mail.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy stalwart:8080
+}
+
+# ──────────────────────────────────────────────
+# WordPress + WooCommerce — CMS + E-commerce
+# ──────────────────────────────────────────────
+www.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy wordpress:80
+}
+
+shop.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy wordpress:80
+}
+
+# ──────────────────────────────────────────────
+# Apache Superset — BI / Analytics
+# ──────────────────────────────────────────────
+analytics.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy superset:8088
+}
+
+# ──────────────────────────────────────────────
+# Zammad — Helpdesk / Ticketing
+# ──────────────────────────────────────────────
+help.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+
+	@websockets {
+		header Connection *Upgrade*
+		header Upgrade websocket
+	}
+	reverse_proxy @websockets zammad:6042
+	reverse_proxy zammad:8080
+}
+
+# ──────────────────────────────────────────────
+# n8n — Workflow Automation
+# ──────────────────────────────────────────────
+auto.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy n8n:5678
+}
+
+# ──────────────────────────────────────────────
+# RAGFlow — Document AI / Knowledge Base
+# Uses forward-auth (no native OIDC)
+# ──────────────────────────────────────────────
+docs.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	import authentik-forward-auth
+	reverse_proxy ragflow:8080
+}
+
+# ──────────────────────────────────────────────
+# Authentik — Identity / SSO Admin
+# ──────────────────────────────────────────────
+auth.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy authentik-server:9000
+}
+
+# ──────────────────────────────────────────────
+# Portainer — Container Management (admin only)
+# ──────────────────────────────────────────────
+admin.{$DOMAIN:oficina.local} {
+	tls internal
+	import security-headers
+	reverse_proxy portainer:9000
+}

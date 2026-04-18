@@ -1,0 +1,126 @@
+{
+  "name": "Oficina: Daily Business Digest",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 8 * * 1-5"
+            }
+          ]
+        }
+      },
+      "id": "cron-trigger",
+      "name": "Weekdays at 8:00 AM",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [250, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://erpnext-backend:8000/api/method/erpnext.accounts.utils.get_balance_on",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-erp-metrics",
+      "name": "ERPNext: Today's Metrics",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 150]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://zammad:8080/api/v1/tickets/search?query=state:open",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-open-tickets",
+      "name": "Zammad: Open Tickets",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "http://wordpress/wp-json/wc/v3/orders?status=processing&after={{ $now.minus(1, 'day').toISODate() }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpBasicAuth",
+        "options": {}
+      },
+      "id": "get-woo-orders",
+      "name": "WooCommerce: New Orders",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [470, 450]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "// Compile all data into a daily digest message\nconst erp = $input.first().json;\nconst tickets = $input.all()[1]?.json || {};\nconst orders = $input.all()[2]?.json || [];\n\nconst today = new Date().toLocaleDateString('es-PE', {\n  weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'\n});\n\nconst message = `📊 *Resumen Diario — ${today}*\n\n💰 *Finanzas*\n• Ventas del día: pendiente\n• Facturas pendientes: pendiente\n\n🎫 *Soporte*\n• Tickets abiertos: ${Array.isArray(tickets) ? tickets.length : 'N/A'}\n\n🛒 *Tienda Online*\n• Pedidos nuevos: ${Array.isArray(orders) ? orders.length : 'N/A'}\n\n_Generado automáticamente por Oficina Digital_`;\n\nreturn [{ json: { message } }];"
+      },
+      "id": "compile-digest",
+      "name": "Compile Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [730, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://rocketchat:3000/api/v1/chat.sendMessage",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"message\": { \"rid\": \"general\", \"msg\": {{ JSON.stringify($json.message) }} } }"
+      },
+      "id": "post-to-chat",
+      "name": "Post to Rocket.Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [950, 300]
+    }
+  ],
+  "connections": {
+    "Weekdays at 8:00 AM": {
+      "main": [
+        [
+          { "node": "ERPNext: Today's Metrics", "type": "main", "index": 0 },
+          { "node": "Zammad: Open Tickets", "type": "main", "index": 0 },
+          { "node": "WooCommerce: New Orders", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "ERPNext: Today's Metrics": {
+      "main": [
+        [{ "node": "Compile Digest", "type": "main", "index": 0 }]
+      ]
+    },
+    "Zammad: Open Tickets": {
+      "main": [
+        [{ "node": "Compile Digest", "type": "main", "index": 0 }]
+      ]
+    },
+    "WooCommerce: New Orders": {
+      "main": [
+        [{ "node": "Compile Digest", "type": "main", "index": 0 }]
+      ]
+    },
+    "Compile Digest": {
+      "main": [
+        [{ "node": "Post to Rocket.Chat", "type": "main", "index": 0 }]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "tags": [{ "name": "oficina" }, { "name": "digest" }, { "name": "daily" }]
+}
