@@ -19,3 +19,130 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+================================================================================
+THIRD-PARTY SOFTWARE LICENSES
+================================================================================
+
+Agant orchestrates the following open-source projects. Each project is
+distributed under its own license. Agant does not modify their source code —
+it deploys, configures, and connects them via their public APIs.
+
+When you run Agant, you agree to comply with each project's license terms.
+
+────────────────────────────────────────────────────────────────────────────────
+ERPNext                                                           GPL v3
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Frappe Technologies Pvt. Ltd.
+https://github.com/frappe/erpnext
+Licensed under the GNU General Public License v3.0
+Full license: https://www.gnu.org/licenses/gpl-3.0.html
+
+────────────────────────────────────────────────────────────────────────────────
+Frappe Framework                                                  MIT
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Frappe Technologies Pvt. Ltd.
+https://github.com/frappe/frappe
+Licensed under the MIT License
+
+────────────────────────────────────────────────────────────────────────────────
+Nextcloud Server                                                  AGPL v3
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Nextcloud GmbH
+https://github.com/nextcloud/server
+Licensed under the GNU Affero General Public License v3.0
+Full license: https://www.gnu.org/licenses/agpl-3.0.html
+
+────────────────────────────────────────────────────────────────────────────────
+Stalwart Mail Server                                              AGPL v3
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Stalwart Labs LLC
+https://github.com/stalwartlabs/stalwart
+Licensed under the GNU Affero General Public License v3.0
+
+────────────────────────────────────────────────────────────────────────────────
+Jitsi Meet                                                        Apache 2.0
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) 8x8, Inc. and Jitsi contributors
+https://github.com/jitsi/jitsi-meet
+Licensed under the Apache License 2.0
+Full license: https://www.apache.org/licenses/LICENSE-2.0
+
+────────────────────────────────────────────────────────────────────────────────
+Jibri (Jitsi Broadcasting Infrastructure)                         Apache 2.0
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) 8x8, Inc. and Jitsi contributors
+https://github.com/jitsi/jibri
+Licensed under the Apache License 2.0
+
+────────────────────────────────────────────────────────────────────────────────
+n8n                                                     Sustainable Use License
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) n8n GmbH
+https://github.com/n8n-io/n8n
+Licensed under the Sustainable Use License
+https://github.com/n8n-io/n8n/blob/master/LICENSE.md
+Note: Free to self-host. Source-available. Not OSI-approved open source.
+
+────────────────────────────────────────────────────────────────────────────────
+Authentik                                                         MIT
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Authentik Security Inc.
+https://github.com/goauthentik/authentik
+Licensed under the MIT License
+
+────────────────────────────────────────────────────────────────────────────────
+Caddy                                                             Apache 2.0
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Matt Holt and The Caddy Authors
+https://github.com/caddyserver/caddy
+Licensed under the Apache License 2.0
+
+────────────────────────────────────────────────────────────────────────────────
+PostgreSQL                                                   PostgreSQL License
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) The PostgreSQL Global Development Group
+https://www.postgresql.org/
+Licensed under the PostgreSQL License (MIT-like)
+https://www.postgresql.org/about/licence/
+
+────────────────────────────────────────────────────────────────────────────────
+MariaDB                                                           GPL v2
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) MariaDB Foundation
+https://github.com/MariaDB/server
+Licensed under the GNU General Public License v2.0
+
+────────────────────────────────────────────────────────────────────────────────
+Redis                                                     RSALv2 / SSPLv1
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Redis Ltd.
+https://github.com/redis/redis
+Dual-licensed under RSALv2 and SSPLv1 (since Redis 7.4)
+https://redis.io/legal/licenses/
+
+────────────────────────────────────────────────────────────────────────────────
+Docker / Moby                                                     Apache 2.0
+────────────────────────────────────────────────────────────────────────────────
+Copyright (c) Docker, Inc.
+https://github.com/moby/moby
+Licensed under the Apache License 2.0
+
+────────────────────────────────────────────────────────────────────────────────
+ALSO INCLUDED IN FULL STACK (compose/):
+────────────────────────────────────────────────────────────────────────────────
+
+Apache Superset         Apache 2.0     https://github.com/apache/superset
+Rocket.Chat             MIT            https://github.com/RocketChat/Rocket.Chat
+Zammad                  AGPL v3        https://github.com/zammad/zammad
+WordPress               GPL v2         https://github.com/WordPress/WordPress
+WooCommerce             GPL v3         https://github.com/woocommerce/woocommerce
+Portainer CE            Zlib           https://github.com/portainer/portainer
+Collabora Online        MPL 2.0        https://github.com/CollaboraOnline/online
+Elasticsearch           SSPL/Elastic   https://github.com/elastic/elasticsearch
+MongoDB                 SSPL           https://github.com/mongodb/mongo
+
+================================================================================
+
+To every contributor to every project listed above: thank you. Your work is
+the foundation of a free and open internet. Agant would not exist without you.
